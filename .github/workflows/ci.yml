@@ -35,19 +35,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Install Poetry
+        run: pipx install poetry==2.5.1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.15"
           cache: poetry
-
-      - name: Install Poetry
-        run: |
-          pipx install poetry==2.5.1
-          PIPX_BIN_DIR="$(pipx environment --value PIPX_BIN_DIR)"
-          echo "$PIPX_BIN_DIR" >> "$GITHUB_PATH"
-          export PATH="$PIPX_BIN_DIR:$PATH"
-          poetry --version
 
       - name: Install project and development dependencies
         run: poetry install --with dev --no-root --no-interaction
