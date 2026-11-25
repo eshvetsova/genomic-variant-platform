@@ -11,6 +11,29 @@ from app.models.project import Project
 from app.repositories.projects import ProjectRepository
 
 
+def _constraint_name(error: BaseException) -> str | None:
+    pending = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+
+        diagnostic = getattr(current, "diag", None)
+        name = getattr(current, "constraint_name", None) or getattr(
+            diagnostic, "constraint_name", None
+        )
+        if name:
+            return name
+
+        for attribute in ("orig", "__cause__", "__context__"):
+            nested = getattr(current, attribute, None)
+            if isinstance(nested, BaseException):
+                pending.append(nested)
+    return None
+
+
 class SqlAlchemyProjectRepository(ProjectRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -26,10 +49,7 @@ class SqlAlchemyProjectRepository(ProjectRepository):
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            constraint = getattr(exc.orig, "constraint_name", None) or getattr(
-                getattr(exc.orig, "diag", None), "constraint_name", None
-            )
-            if constraint == "uq_projects_name":
+            if _constraint_name(exc) == "uq_projects_name":
                 raise ProjectNameAlreadyExistsError(project.name) from exc
             raise
         await self.session.refresh(db_project)
